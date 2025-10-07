@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Drag & Match — Autonomic Nervous System</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #111827;
+      --muted: #94a3b8;
+      --text: #e5e7eb;
+      --card: #1f2937;
+      --chip: #374151;
+      --accent: #22d3ee;
+      --ok: #22c55e;
+      --bad: #ef4444;
+      --warning: #f59e0b;
+    }
+    * { box-sizing: border-box }
+    html, body { height: 100% }
+    body {
+      margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, 'Helvetica Neue', Arial, 'Noto Sans', 'Apple Color Emoji', 'Segoe UI Emoji';
+      background: radial-gradient(1200px 700px at 80% -10%, #1e293b 0%, var(--bg) 60%);
+      color: var(--text);
+    }
+    .app { display: grid; grid-template-rows: auto auto 1fr; gap: 16px; padding: 20px; max-width: 1200px; margin: 0 auto; }
+    header { display: flex; align-items: center; gap: 16px; justify-content: space-between; }
+    h1 { font-size: 20px; margin: 0; letter-spacing: 0.3px; font-weight: 650 }
+    .timer { font-variant-numeric: tabular-nums; background: #0b1220; padding: 10px 14px; border-radius: 10px; border: 1px solid #1e293b; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04); }
+    .controls { background: var(--panel); border: 1px solid #1f2937; border-radius: 14px; padding: 14px; display: grid; gap: 10px; grid-template-columns: 1fr auto; align-items: start; }
+    .controls textarea { width: 100%; min-height: 120px; resize: vertical; background: #0b1220; color: var(--text); border: 1px solid #223049; border-radius: 10px; padding: 10px; line-height: 1.35; }
+    .btnrow { display: flex; gap: 10px; align-items: center; flex-wrap: wrap }
+    .btnrow label { display: inline-flex; gap: 8px; align-items: center; background: #0b1220; border: 1px solid #223049; padding: 8px 10px; border-radius: 10px; font-size: 13px; color: var(--muted); }
+    button { background: linear-gradient(180deg, #0ea5e9 0%, #06b6d4 100%); color: #06202b; border: 0; border-radius: 12px; padding: 10px 14px; font-weight: 650; cursor: pointer; box-shadow: 0 4px 14px rgba(34, 211, 238, 0.25); }
+    button.secondary { background: #0b1220; color: var(--text); border: 1px solid #223049; box-shadow: none; }
+    .board { display: grid; grid-template-columns: 1.3fr 0.7fr; gap: 16px; min-height: 420px; }
+    .column { background: var(--panel); border: 1px solid #1f2937; border-radius: 14px; padding: 14px; display: grid; gap: 12px; align-content: start; }
+    .column h2 { margin: 0; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted) }
+    .card { background: var(--card); border: 1px solid #263142; border-radius: 12px; padding: 12px; display: grid; gap: 8px; position: relative; transition: background-color 0.5s ease; }
+    .card .def { font-size: 14px; line-height: 1.25 }
+    .dropzone { border: 1px dashed #334155; border-radius: 10px; padding: 8px; min-height: 38px; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 12px }
+    .card.correct { border-color: rgba(34,197,94,.7); background: rgba(34,197,94,.1) }
+    .card.wrong { border-color: rgba(239,68,68,.7); background: rgba(239,68,68,.2); }
+    @keyframes shake { 10%, 90% { transform: translateX(-2px) } 20%, 80% { transform: translateX(4px) } 30%, 50%, 70% { transform: translateX(-8px) } 40%, 60% { transform: translateX(8px) } }
+    .shake { animation: shake 400ms ease-in-out }
+    .chip { background: var(--chip); border: 1px solid #2b3547; border-radius: 999px; padding: 8px 12px; font-size: 13px; cursor: grab; user-select: none; display: inline-flex; align-items: center; justify-content: center; }
+    .chip:active { cursor: grabbing }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px }
+    .ghost { opacity: 0.2 }
+    .hidden { display: none !important }
+    .fadeout { transition: opacity 220ms ease-out, transform 220ms ease-out; opacity: 0; transform: scale(.98) }
+    .footer { color: var(--muted); font-size: 12px; text-align: right; }
+    .toast { position: fixed; inset: auto 20px 20px auto; background: #0b1220; border: 1px solid #223049; border-radius: 12px; padding: 10px 12px; font-size: 14px; }
+    @media (max-width: 900px){ .board { grid-template-columns: 1fr } }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>Drag & Match — ANS</h1>
+      <div class="timer" id="timer">00:00.0</div>
+    </header>
+
+    <section class="controls">
+      <textarea id="tableInput" placeholder="Paste a Markdown table with two columns: Definition | Term"></textarea>
+      <div class="btnrow">
+        <label><input type="checkbox" id="shuffleDefs"> Shuffle definitions</label>
+        <button id="loadBtn">Load Data</button>
+        <button id="sampleBtn" class="secondary">Load Sample</button>
+        <button id="resetBtn" class="secondary">Reset</button>
+      </div>
+    </section>
+
+    <section class="board">
+      <div class="column">
+        <h2>Definitions</h2>
+        <div id="defs"></div>
+      </div>
+      <div class="column">
+        <h2>Terms</h2>
+        <div id="terms" class="chips"></div>
+      </div>
+    </section>
+
+    <div class="footer">Paste → Load Data → Drag terms onto the matching definition. Cards turn green when correct; red fades out when incorrect. Toggle “Shuffle definitions” to randomize definition order each round. When all matched, time stops.</div>
+    <div class="toast hidden" id="toast"></div>
+  </div>
+
+<script>
+(function(){
+  const $ = s => document.querySelector(s);
+  const strip = s => s.replace(/^[*_`\s]+|[*_`\s]+$/g, '').replace(/^\*\*|\*\*$/g, '').trim();
+  const normalize = s => strip(String(s)).toLowerCase().replace(/\s+/g,' ').trim();
+  const shuffle = arr => arr.map(v=>[Math.random(),v]).sort((a,b)=>a[0]-b[0]).map(p=>p[1]);
+  const el = (t,c,txt)=>{const e=document.createElement(t);if(c)e.className=c;if(txt!=null)e.textContent=txt;return e;};
+  const toast = (msg,ms=2400)=>{const t=$('#toast');t.textContent=msg;t.classList.remove('hidden');setTimeout(()=>t.classList.add('hidden'),ms);};
+
+  let startTime=null,timerId=null,running=false,finished=false,matchedCount=0,totalCount=0;
+  const fmt=ms=>{const t=Math.max(0,ms|0);const m=Math.floor(t/60000);const s=Math.floor((t%60000)/1000);const d=Math.floor((t%1000)/100);return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}.${d}`};
+  function startTimer(){if(running)return;startTime=performance.now();running=true;tick();}
+  function tick(){if(!running)return;const now=performance.now();$('#timer').textContent=fmt(now-startTime);timerId=requestAnimationFrame(tick);}
+  function stopTimer(){running=false;if(timerId)cancelAnimationFrame(timerId);}
+  function resetTimer(){stopTimer();$('#timer').textContent='00:00.0';}
+
+  function parseTable(md){
+    const lines=md.split(/\r?\n/).filter(l=>/\|/.test(l));
+    if(lines.length<2)return[];
+    const rows=[];
+    for(const line of lines){
+      const trimmed=line.trim();
+      if(/^\|?\s*-+\s*\|/.test(trimmed))continue;
+      const parts=trimmed.split('|').map(s=>s.trim()).filter(Boolean);
+      if(parts.length<2)continue;
+      const def=strip(parts[0]);
+      const term=strip(parts[1]);
+      if(def&&term)rows.push({def,term,termNorm:normalize(term)});
+    }
+    return rows;
+  }
+
+  function buildGame(rows, shuffleDefinitions=false){
+    $('#defs').innerHTML='';$('#terms').innerHTML='';matchedCount=0;finished=false;totalCount=rows.length;resetTimer();
+
+    const defsRows = shuffleDefinitions ? shuffle([...rows]) : [...rows];
+
+    const defsFrag=document.createDocumentFragment();
+    defsRows.forEach(row=>{
+      const card=el('div','card');
+      const def=el('div','def',row.def);
+      const drop=el('div','dropzone','Drop matching term here');
+      drop.dataset.expect=row.termNorm;
+      drop.addEventListener('dragover',e=>e.preventDefault());
+      drop.addEventListener('drop',onDrop);
+      card.append(def,drop);defsFrag.append(card);
+    });
+    $('#defs').append(defsFrag);
+
+    const terms=shuffle(rows.map(r=>({label:r.term,termNorm:r.termNorm})));
+    const chipsFrag=document.createDocumentFragment();
+    terms.forEach((t,i)=>{
+      const chip=el('div','chip',t.label);
+      chip.setAttribute('draggable','true');
+      chip.id=`chip-${i}`;
+      chip.dataset.termNorm=t.termNorm;
+      chip.addEventListener('dragstart',onDragStart);
+      chip.addEventListener('dragend',onDragEnd);
+      chipsFrag.append(chip);
+    });
+    $('#terms').append(chipsFrag);
+    toast(`Loaded ${rows.length} cards${shuffleDefinitions ? ' (definitions shuffled)' : ''}. Drag to start.`);
+  }
+
+  function onDragStart(e){if(!running&&!finished)startTimer();e.dataTransfer.setData('text/plain',e.target.id);e.target.classList.add('ghost');}
+  function onDragEnd(e){e.target.classList.remove('ghost');}
+  function onDrop(e){
+    e.preventDefault();
+    const drop=e.currentTarget;
+    const card=drop.closest('.card');
+    const expect=drop.dataset.expect;
+    const chipId=e.dataTransfer.getData('text/plain');
+    const chip=document.getElementById(chipId);
+    if(!chip)return;
+    const provided=chip.dataset.termNorm;
+    const correct=provided===expect;
+    if(correct){
+      drop.textContent=chip.textContent;
+      card.classList.add('correct');
+      chip.classList.add('fadeout');
+      setTimeout(()=>chip.remove(),200);
+      setTimeout(()=>{card.classList.add('fadeout');setTimeout(()=>card.remove(),220);},280);
+      matchedCount++;
+      if(matchedCount===totalCount){finished=true;stopTimer();toast(`All matched! Final time: ${$('#timer').textContent}`,5000);}
+    } else {
+      card.classList.add('wrong');
+      card.classList.add('shake');
+      setTimeout(()=>{card.classList.remove('wrong');},500);
+      setTimeout(()=>card.classList.remove('shake'),420);
+    }
+  }
+
+  const SAMPLE=`| **Definition** | **Terms to Match** |
+|-----------------|------------------|
+| Part of the peripheral nervous system that regulates involuntary body functions. | Autonomic Nervous System |
+| Division of the ANS responsible for 'fight or flight' responses. | Sympathetic Nervous System |
+| Division of the ANS responsible for 'rest and digest' functions. | Parasympathetic Nervous System |
+| The main neurotransmitter released by preganglionic neurons in both ANS divisions. | Acetylcholine |
+| The neurotransmitter primarily used by postganglionic sympathetic neurons. | Norepinephrine |
+| A cluster of nerve cell bodies in the peripheral nervous system where ANS synapses occur. | Autonomic Ganglion |
+| The system that controls heart rate, digestion, respiratory rate, pupillary response, and urination. | Autonomic Nervous System |
+| Long preganglionic and short postganglionic fibers; promotes digestion and energy storage. | Parasympathetic Nervous System |
+| Short preganglionic and long postganglionic fibers; increases heart rate and dilates pupils. | Sympathetic Nervous System |
+| Receptors that respond to norepinephrine and epinephrine; subdivided into alpha and beta types. | Adrenergic Receptors |
+| Receptors that respond to acetylcholine; subdivided into nicotinic and muscarinic types. | Cholinergic Receptors |`;
+
+  $('#sampleBtn').addEventListener('click',()=>{$('#tableInput').value=SAMPLE;$('#loadBtn').click();});
+  $('#loadBtn').addEventListener('click',()=>{
+    const rows=parseTable($('#tableInput').value||'');
+    if(!rows.length){toast('Could not parse table');return;}
+    const shuffleDefs = document.getElementById('shuffleDefs').checked;
+    buildGame(rows, shuffleDefs);
+  });
+  $('#resetBtn').addEventListener('click',()=>{
+    const rows=parseTable($('#tableInput').value||'');
+    if(!rows.length){$('#defs').innerHTML='';$('#terms').innerHTML='';resetTimer();matchedCount=0;totalCount=0;finished=false;toast('Cleared. Paste data and Load.');return;}
+    const shuffleDefs = document.getElementById('shuffleDefs').checked;
+    buildGame(rows, shuffleDefs);
+  });
+  $('#tableInput').value=SAMPLE;
+})();
+</script>
+</body>
+</html>
